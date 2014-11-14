@@ -1,3 +1,4 @@
+#personal
 data/
 *.*~
 
@@ -55,4 +56,3 @@ docs/_build/
 
 # PyBuilder
 target/
-
