@@ -27,7 +27,7 @@ class RIVM_template(preprocessor.Template):
                       preprocessor.Datatype.rem,
                       preprocessor.Datatype.rem,
                       preprocessor.Datatype.sst,
-                      preprocessor.Datatype.rem,
+                      preprocessor.Datatype.con,
                       preprocessor.Datatype.zdt,
                       preprocessor.Datatype.lbl,
                       preprocessor.Datatype.rem]

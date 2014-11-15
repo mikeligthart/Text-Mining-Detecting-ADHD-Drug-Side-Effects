@@ -12,8 +12,8 @@ class Preprocessor(object):
            the items are seperated using a given delimiter and
            stored in a Pandas DataFrame"""
                 
-        self.template = template
         self.file = open(file_location, 'r')
+        self.template = template
         
         data = []
         for line in self.file.readlines():
@@ -21,15 +21,15 @@ class Preprocessor(object):
         self.data = pd.DataFrame(data, columns=template.headers)
         self.isProcessed = False
 
-    def process(self, form='nltk'):
-        self.transform_into_internal_format()
+    def process(self, form='nltk', wordlist=[]):
+        self.transform_into_internal_format(wordlist)
 
         if (form.lower() == 'nltk'):
             return self.transform_into_ntlk_format()
         else:
             return []
 
-    def transform_into_internal_format(self):
+    def transform_into_internal_format(self, wordlist):
         """The stored data is pre-processed feature by feature according to a given template.
            Features will be excluded, transformed to integers given a mapping or tokenized.
         """
@@ -47,8 +47,8 @@ class Preprocessor(object):
 
                 #Recode integer string to integers
                 elif(self.template.types[colindex].value == Datatype.itg.value):
-                    f = lambda x: int(x)
-                    self.data[col] = self.data[col].apply(f)
+                    to_int = lambda x: int(x)
+                    self.data[col] = self.data[col].apply(to_int)
 
                 #Recode nominal data to integers
                 elif(self.template.types[colindex].value == Datatype.dct.value):
@@ -59,10 +59,31 @@ class Preprocessor(object):
                 elif(self.template.types[colindex].value == Datatype.lbl.value):
                       self.data = self.data.replace({col:self.template.label})
 
-                #Tokenize textual content
+                #Create new monogram features from the textual content.
                 elif(self.template.types[colindex].value == Datatype.con.value):
-                    f = lambda x: nltk.word_tokenize(x)
-                    self.data[col] = self.data[col].apply(f)            
+
+                    #Tokenize the textual content
+                    tokenize = lambda text: nltk.word_tokenize(text)
+                    self.data[col] = self.data[col].apply(tokenize)
+
+                    #Every words needs to be lowercase
+                    lower = lambda text: map(str.lower, text)
+                    self.data[col] = self.data[col].apply(lower)
+
+                    #Artifcats will be filtered from the data
+                    clean_artifcats = lambda text : [token.replace('\\n', '') for token in text]
+                    self.data[col] = self.data[col].apply(clean_artifcats)
+
+                    #If wordlist does not exist build a new one (building a training set)
+                    if not wordlist:
+                        self.wordlist = self.generate_ordered_wordlist(self.data[col])
+                    #If wordlist exist we're dealing with unseen cases that needs to be mapped to the existing features
+                    else:
+                        self.wordlist = wordlist
+
+                    for word in self.wordlist:
+                        for i in range(0,len(self.data)):
+                            self.data[word].iloc[i] = word in self.data[col].iloc[i]
 
                 #Go to the next column
                 colindex += 1
@@ -73,7 +94,24 @@ class Preprocessor(object):
         labels = self.data[label_name].values.tolist()
         data = self.data.drop(label_name,1)
         data = data.to_dict('records')
-        return list(zip(data,labels))      
+        return list(zip(data,labels))
+
+    def generate_ordered_wordlist(self, column):
+        wordlist = []
+
+        #Extract bags of words from every entry in dataset
+        extract_wordlist = lambda seperate_wordlist: wordlist.append(seperate_wordlist)
+        column.apply(extract_wordlist)
+
+        #Flatten word list
+        wordlist = [item for sublist in wordlist for item in sublist]
+
+        #Order by frequency (from HF to LF)
+        wordlist = nltk.FreqDist(wordlist).items()
+        wordlist = sorted(wordlist, key=lambda tup: tup[1])[::-1]
+        (wordlist, _) = zip(*wordlist)
+
+        return wordlist
     
 class Datatype(Enum):
     """Enum capturing the different types of data present in various datasets"""
