@@ -7,21 +7,23 @@ import nltk
 class Preprocessor(object):
     """Preprocessor splits batches of delimited data into seperate features according to a given template"""
 
-    def __init__(self, file_location, delimiter, template):
+    def __init__(self, prime_location, folds, delimiter, template):
         """The raw data will be read from a file,
            the items are seperated using a given delimiter and
            stored in a Pandas DataFrame"""
                 
-        self.file = open(file_location, 'r')
         self.template = template
-
         #Raw content will eventually be replaced with processed features.
         #For further analysis a copy of the raw content is stored.
         self.nested_content = []
         
         data = []
-        for line in self.file.readlines():
-            data.append(line.split(delimiter))
+        for location in folds:
+            file = open(prime_location + '/' + location, 'r')
+            for line in file.readlines():
+                data.append(line.split(delimiter))
+            file.close()
+            
         self.data = pd.DataFrame(data, columns=template.headers)
 
         #Data only has to be processed once
@@ -47,6 +49,7 @@ class Preprocessor(object):
         """
         colindex = 0
         dictindex = 0
+        conindex = 0
         for col in self.template.headers:
             #Remove the features that need to be removed according to the template
             if(self.template.types[colindex].value == Datatype.rem.value): 
@@ -70,7 +73,7 @@ class Preprocessor(object):
             elif(self.template.types[colindex].value == Datatype.lbl.value):
                   self.data = self.data.replace({col:self.template.label})
 
-            #Create new monogram features from the textual content.
+            #Create new n-gram features heads from the textual content.
             elif(self.template.types[colindex].value == Datatype.con.value):
 
                 #Tokenize the textual content
@@ -93,14 +96,17 @@ class Preprocessor(object):
                 else:
                     self.nested_content.append(self.aggregate_content_to_nested_list(self.data[col]))
                     self.wordlist = wordlist
-
-                #Build monograms features from bags of words and collect frequencies per monogram for every record
-                featurelist = self.generate_features_from_wordlists(self.wordlist, self.nested_content[-1])
-                self.data = self.data.drop(col,1)
-                self.data = pd.concat([self.data, featurelist], axis=1)
+                conindex = col
 
             #Go to the next column
-            colindex += 1               
+            colindex += 1
+
+        #Calculate n-gram features from bags of words and collect frequencies per monogram for every record
+        featurelist = self.generate_features_from_wordlists(self.wordlist, self.nested_content[-1])
+        self.data = self.data.drop(conindex,1)
+        self.data = pd.concat([self.data, featurelist], axis=1)
+
+        #Precent from running this process again when it already run onces.
         self.isProcessed = True
 
     def transform_into_ntlk_format(self):
@@ -171,8 +177,8 @@ class Preprocessor(object):
                     freq_profile.append(0)
             #Add the frequency profile for this record to the list of records
             features.append(pd.Series(freq_profile, wordlist))
-            feature_table = pd.concat(features, axis=1)
 
+        feature_table = pd.concat(features, axis=1)
         return feature_table.transpose()
             
                 
