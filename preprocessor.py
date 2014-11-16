@@ -27,21 +27,21 @@ class Preprocessor(object):
         #Data only has to be processed once
         self.isProcessed = False
 
-    def process(self, form='nltk', wordlist=[]):
+    def process(self, form='nltk', wordlist=[], degree=1):
         """Returns pre-processed data. The format can either be NLTK suitable or the internal format (Pandas.Dataframe).
            When building a trainingset the given wordlist is empty (default).
            When pre-processing test or real data the wordlist of the training set needs to be given.
         """
         
         if (~self.isProcessed):
-            self.transform_into_internal_format(wordlist)
+            self.transform_into_internal_format(wordlist, degree)
 
         if (form.lower() == 'nltk'):
             return self.transform_into_ntlk_format()
         else:
             return self.data
 
-    def transform_into_internal_format(self, wordlist):
+    def transform_into_internal_format(self, wordlist, degree=1):
         """The stored data is pre-processed feature by feature according to a given template.
            Features will be excluded, transformed to integers given a mapping or tokenized.
         """
@@ -88,7 +88,7 @@ class Preprocessor(object):
                 #If wordlist does not exist build a new one (building a training set)
                 if not wordlist:
                     self.nested_content.append(self.aggregate_content_to_nested_list(self.data[col]))
-                    self.wordlist = self.list_of_wordlists_to_ordered_wordlist(self.nested_content[-1])
+                    self.wordlist = self.list_of_wordlists_to_ordered_wordlist(self.nested_content[-1], degree)
                 #If wordlist exist we're dealing with unseen cases that needs to be mapped to the existing features
                 else:
                     self.nested_content.append(self.aggregate_content_to_nested_list(self.data[col]))
@@ -118,10 +118,13 @@ class Preprocessor(object):
         #Deliver (features,label) for every record in table in a list
         return list(zip(data,labels))
 
-    def list_of_wordlists_to_ordered_wordlist(self, nested_content):
+    def list_of_wordlists_to_ordered_wordlist(self, nested_content, degree=1):
         """This method builds a ordered wordlist from a list of nested content"""
         #Flatten nested_wordlist
         wordlist = [item for sublist in nested_content for item in sublist]
+
+        if (degree > 1):
+            wordlist = list(nltk.ngrams(wordlist,degree,pad_left=True, pad_right=False))
 
         #Order by frequency (from HF to LF)
         wordlist = nltk.FreqDist(wordlist).items()
@@ -140,11 +143,10 @@ class Preprocessor(object):
 
         return nested_content
 
-    def generate_features_from_wordlists(self, wordlist, nested_content):
+    def generate_features_from_wordlists(self, wordlist, nested_content, useFreq=False):
         """Every word in the wordlist will become a new features.
           Every word in the wordlist occurs 0 till n times in a content block.
-          These frequencies are collected for a content block for every record.
-          These so called frequency profiles are stored in a table"""
+          The values of the features are either represented as a boolean (default) or a frequency"""
         
         features = []
 
@@ -159,8 +161,11 @@ class Preprocessor(object):
             for word in wordlist:
                 #Check if that occurs in the content
                 if word in contentwords:
-                    #Yes: retrieve the freqency
-                    freq_profile.append(freq[contentwords.index(word)])
+                    if useFreq:
+                        #Yes-Yes: retrieve the freqency
+                        freq_profile.append(freq[contentwords.index(word)])
+                    else:
+                        freq_profile.append(1)
                 else:
                     #No: the frequency is 0
                     freq_profile.append(0)
