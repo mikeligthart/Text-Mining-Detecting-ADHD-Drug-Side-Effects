@@ -1,10 +1,10 @@
 from enum import Enum
 import numpy as np
-import pandas as pd
+import atpy
 import nltk
 
 
-class Preprocessor(object):
+class Preprocessor2(object):
     """Preprocessor splits batches of delimited data into seperate features according to a given template"""
 
     def __init__(self, prime_location, folds, delimiter, template):
@@ -13,25 +13,23 @@ class Preprocessor(object):
            stored in a Pandas DataFrame"""
                 
         self.template = template
-        #Raw content will eventually be replaced with processed features.
-        #For further analysis a copy of the raw content is stored.
-        self.nested_content = []
-        
-        data = []
+        self.header = self.template.headers
+        self.data = self.header
         if len(folds) == 1:
             file = open(prime_location + '/' + folds[0], 'r')
             for line in file.readlines():
-                data.append(line.split(delimiter))
+                self.data.append(line.split(delimiter))
             file.close()
         else:
             for location in folds:
                 file = open(prime_location + '/' + location, 'r')
                 for line in file.readlines():
-                    data.append(line.split(delimiter))
+                    self.data.append(line.split(delimiter))
                 file.close()
-            
-        self.data = pd.DataFrame(data, columns=template.headers)
 
+        self.blaat = atpy.Table()
+        self.blaat.read(self.data, type='ascii')
+        
         #Data only has to be processed once
         self.isProcessed = False
 
@@ -53,34 +51,34 @@ class Preprocessor(object):
         """The stored data is pre-processed feature by feature according to a given template.
            Features will be excluded, transformed to integers given a mapping or tokenized.
         """
-        colindex = 0
+        remove_index = []
         dictindex = 0
         conindex = 0
-        for col in self.template.headers:
+        for index in range(0,len(self.headers)):
             #Remove the features that need to be removed according to the template
-            if(self.template.types[colindex].value == Datatype.rem.value): 
-                self.data = self.data.drop(col,1)
+            if(self.template.types[index].value == Datatype.rem.value): 
+                remove_index.append(index)
                 
             #Recode boolean data to integers
-            elif(self.template.types[colindex].value == Datatype.bln.value): 
+            elif(self.template.types[index].value == Datatype.bln.value): 
                 self.data = self.data.replace({col:{'f':0,'t':1}})
 
             #Recode integer string to integers
-            elif(self.template.types[colindex].value == Datatype.itg.value):
+            elif(self.template.types[index].value == Datatype.itg.value):
                 to_int = lambda x: int(x)
                 self.data[col] = self.data[col].apply(to_int)
 
             #Recode nominal data to integers
-            elif(self.template.types[colindex].value == Datatype.dct.value):
+            elif(self.template.types[index].value == Datatype.dct.value):
                   self.data = self.data.replace({col:self.template.dicts[dictindex]})
                   dictindex += 1
 
             #Recode the labels to integers
-            elif(self.template.types[colindex].value == Datatype.lbl.value):
+            elif(self.template.types[index].value == Datatype.lbl.value):
                   self.data = self.data.replace({col:self.template.label})
 
             #Create new n-gram features heads from the textual content.
-            elif(self.template.types[colindex].value == Datatype.con.value):
+            elif(self.template.types[index].value == Datatype.con.value):
 
                 #Tokenize the textual content
                 tokenize = lambda text: nltk.word_tokenize(text)
@@ -94,10 +92,6 @@ class Preprocessor(object):
                 clean_artifcats = lambda text : [token.replace('\\n', '') for token in text]
                 self.data[col] = self.data[col].apply(clean_artifcats)
 
-                #Non-relevant items need to be removed from text
-                remove_non_relevant = lambda text : [x for x in text if (len(x) >= 4 and x not in nltk.corpus.stopwords.words('dutch'))]
-                self.data[col] = self.data[col].apply(remove_non_relevant)
-
                 #If wordlist does not exist build a new one (building a training set)
                 if not wordlist:
                     self.nested_content.append(self.aggregate_content_to_nested_list(self.data[col]))
@@ -106,11 +100,16 @@ class Preprocessor(object):
                 else:
                     self.nested_content.append(self.aggregate_content_to_nested_list(self.data[col]))
                     self.wordlist = wordlist
-                conindex = col
 
             #Go to the next column
             colindex += 1
 
+        #Remove all the items from the remove list
+        for i in remove_index:
+            del self.data[i]
+            del self.header[i]
+            del self.type[i]
+            
         #Calculate n-gram features from bags of words and collect frequencies per monogram for every record
         featurelist = self.generate_features_from_wordlists(self.wordlist, self.nested_content[-1])
         self.data = self.data.drop(conindex,1)
@@ -133,6 +132,21 @@ class Preprocessor(object):
 
         #Deliver (features,label) for every record in table in a list
         return list(zip(data,self.labels))
+
+    def list_of_wordlists_to_ordered_wordlist(self, nested_content, degree=1):
+        """This method builds a ordered wordlist from a list of nested content"""
+        #Flatten nested_wordlist
+        wordlist = [item for sublist in nested_content for item in sublist]
+
+        if (degree > 1):
+            wordlist = list(nltk.ngrams(wordlist,degree,pad_left=True, pad_right=False))
+
+        #Order by frequency (from HF to LF)
+        wordlist = nltk.FreqDist(wordlist).items()
+        wordlist = sorted(wordlist, key=lambda tup: tup[1])[::-1]
+        (wordlist, _) = zip(*wordlist)
+
+        return wordlist
 
     def aggregate_content_to_nested_list(self, column):
         """This method nests all the seperate content blocks in a list"""
@@ -178,6 +192,8 @@ class Preprocessor(object):
 
     def save(self, fileloc):
         self.data.to_pickle(fileloc)
+
+
                 
     
 class Datatype(Enum):
@@ -203,4 +219,3 @@ class Template(object):
         self.types = [] #Types of the features
         self.dicts = [] #List of mappings of nominal data to int. Ordered from left to right column-wise
         self.label = {} #Labels
-        self.delimiter = []

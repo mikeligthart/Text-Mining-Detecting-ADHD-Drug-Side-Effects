@@ -1,9 +1,11 @@
-import preprocessor
+import preprocessor3
 
-class RIVM_template(preprocessor.Template):
+class RIVM_template(preprocessor3.Template):
 
     def __init__(self):
         super(RIVM_template,self).__init__()
+        self.delimiter= '\t'
+        
         self.headers = ['id',
                        'forum',
                        'sub_forum',
@@ -18,22 +20,24 @@ class RIVM_template(preprocessor.Template):
                        self.label_name,
                        'topic_id']
 
-        self.types = [preprocessor.Datatype.rem,
-                      preprocessor.Datatype.rem,
-                      preprocessor.Datatype.dct,
-                      preprocessor.Datatype.rem,
-                      preprocessor.Datatype.bln,
-                      preprocessor.Datatype.rem,
-                      preprocessor.Datatype.rem,
-                      preprocessor.Datatype.rem,
-                      preprocessor.Datatype.sst,
-                      preprocessor.Datatype.con,
-                      preprocessor.Datatype.zdt,
-                      preprocessor.Datatype.lbl,
-                      preprocessor.Datatype.rem]
+        self.types = [preprocessor3.Datatype.rem,
+                      preprocessor3.Datatype.rem,
+                      preprocessor3.Datatype.rem,
+                      preprocessor3.Datatype.rem,
+                      preprocessor3.Datatype.rem,
+                      preprocessor3.Datatype.rem,
+                      preprocessor3.Datatype.rem,
+                      preprocessor3.Datatype.rem,
+                      preprocessor3.Datatype.rem,
+                      preprocessor3.Datatype.con,
+                      preprocessor3.Datatype.rem,
+                      preprocessor3.Datatype.lbl,
+                      preprocessor3.Datatype.rem]
 
         self.subforum = {'Gezondheid': 0, 'Kinderen': 1, 'Psyche': 2}
 
         self.dicts = [self.subforum]
 
         self.label = {'f':0, 't':1}
+
+        self.artefacts = ['\\n']

@@ -5,12 +5,22 @@ import preprocessor
 from random import shuffle
 import time
 
-#Prepare folds
-t_begin = time.time()
+def get_train_folds(folds, index):
+    if index == len(folds)-1:
+        return folds[0:index]
+    else:
+        return folds[0:index] + folds[index+1:]
+    
+#Build training and test sets for n-folds crossvalidation
 folds = os.listdir('data/rivm')
-shuffle(folds)
-preproc_train = preprocessor.Preprocessor('data/rivm', folds[0:8],'\t',rivm.RIVM_template())
-train_set = preproc_train.process()
-print(time.time() - t_begin)
-preproc_test = preproc = preprocessor.Preprocessor('data/rivm', folds[9],'\t',rivm.RIVM_template())
-test_set = preproc_test.process(wordlist=preproc_train.wordlist)
+#shuffle(folds)
+for index in range(0, len(folds)):
+    preproc_train = preprocessor.Preprocessor('data/rivm', get_train_folds(folds, index),'\t',rivm.RIVM_template())
+    preproc_train.process()
+    preproc_train.save('data/rivm-preprocessed/train_' + str(index))
+    preproc_test = preproc = preprocessor.Preprocessor('data/rivm', [folds[index]],'\t',rivm.RIVM_template())
+    preproc_test.process(wordlist=preproc_train.wordlist)
+    preproc_test.save('data/rivm-preprocessed/test_' + str(index))
+
+
+    
