@@ -14,11 +14,14 @@ class Preprocessor3(object):
         self.folds[:] = [location + i for i in self.folds]
 
         #Build training set
+        print('Start building training_set...')
         self.build_training_set(self.get_training_folds(self.folds, test_index), n_gram_degree, is_accumalative_n_gram)
-
+        print('Finished building training_set...')
+        
         #Build test set
+        print('Start building test_set...')
         self.build_test_set(self.folds[test_index], n_gram_degree, is_accumalative_n_gram)
-
+        print('Finished building test_set...')
 
     def build_training_set(self, folds, n_gram_degree, is_accumalative_n_gram):
         headers = list(self.template.headers)
@@ -35,30 +38,37 @@ class Preprocessor3(object):
         #Process raw data
         #1. obtain labels
         (labels, raw_data) = self.obtain_labels(raw_data, headers, types)
+        print('1. Obtained labels')
 
         #2. removing features that are marked for removal
         remove_list = self.find_all_occurences_in_Datatype_list(Datatype.rem, types)
         raw_data = self.remove_features(raw_data, remove_list, headers, types)
-
+        print('2. Removed unrequired features')
+        
         #3. Clean content
         content_list = self.find_all_occurences_in_Datatype_list(Datatype.con, types)
         (raw_data, self.featureset, feature_list) = self.clear_content_and_initialize_featureset(raw_data, content_list)
+        print('3. Cleared content')
         
         #4. Create n-grams and featuresets
         if n_gram_degree > 1:
             (raw_data, self.featureset, feature_list, headers, types) = self.create_ngrams_and_featuresets(raw_data, self.featureset, is_accumalative_n_gram, n_gram_degree, content_list, feature_list, headers, types)
         feature_start_index = len(raw_data[0])
+        print('4. Created n-grams and initialized featuresets')
         
         #5. calculate feature values
         for content_index in range(0,len(content_list)):
             for feature_index in range(0,len(self.featureset[0])):
                 (raw_data, headers, types) = self.calculate_feature_values(raw_data, self.featureset, feature_list, content_index, feature_index, headers, types)        
-
+        print('5. Calculated feature values')
+        
         #6. Rewrite to NLTK format
-        trainingset_data = []
-        for record_number in range(0,len(raw_data)):
-            trainingset_data.append(self.list_to_nltk_format(raw_data, feature_start_index, record_number, headers))
-        self.training_set = list(zip(trainingset_data, labels))
+        #trainingset_data = []
+        #for record_number in range(0,len(raw_data)):
+            #trainingset_data.append(self.list_to_nltk_format(raw_data, feature_start_index, record_number, headers))
+        #self.training_set = list(zip(trainingset_data, labels))
+        self.training_set = raw_data
+        print('6. Build training_set')
 
     def build_test_set(self, fold, n_gram_degree, is_accumalative_n_gram):
         headers = list(self.template.headers)
@@ -94,10 +104,11 @@ class Preprocessor3(object):
                 (raw_data, headers, types) = self.calculate_feature_values(raw_data, self.featureset, feature_list, content_index, feature_index, headers, types)
 
         #6. Rewrite to NLTK format
-        testset_data = []
-        for record_number in range(0,len(raw_data)):
-            testset_data.append(self.list_to_nltk_format(raw_data, feature_start_index, record_number, headers))
-        self.test_set = list(zip(testset_data, labels))
+        #testset_data = []
+        #for record_number in range(0,len(raw_data)):
+            #testset_data.append(self.list_to_nltk_format(raw_data, feature_start_index, record_number, headers))
+        #self.test_set = list(zip(testset_data, labels))
+        self.test_set = raw_data
         
     ## PIPELINE METHODS ##
     #1.
@@ -183,9 +194,6 @@ class Preprocessor3(object):
 
     #5.
     def calculate_feature_values(self, raw_data, featureset, feature_list, content_index, feature_index, headers, types):
-        print(feature_list)
-        print(content_index)
-        print(feature_index)
         featureset_to_data_index = feature_list[content_index][feature_index]
         features = featureset[content_index][feature_index]
         for index in range(0, len(features)):
