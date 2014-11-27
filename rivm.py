@@ -1,6 +1,6 @@
-import pipeline
+from pipeline import Template, Datatype
 
-class RIVM_template(pipeline.Template):
+class RIVM_template(Template):
 
     def __init__(self):
         super(RIVM_template,self).__init__()
@@ -20,19 +20,19 @@ class RIVM_template(pipeline.Template):
                        self.label_name,
                        'topic_id']
 
-        self.types = [pipeline.Datatype.rem,
-                      pipeline.Datatype.rem,
-                      pipeline.Datatype.rem,
-                      pipeline.Datatype.rem,
-                      pipeline.Datatype.rem,
-                      pipeline.Datatype.rem,
-                      pipeline.Datatype.rem,
-                      pipeline.Datatype.rem,
-                      pipeline.Datatype.rem,
-                      pipeline.Datatype.con,
-                      pipeline.Datatype.rem,
-                      pipeline.Datatype.lbl,
-                      pipeline.Datatype.rem]
+        self.types = [Datatype.rem,
+                      Datatype.rem,
+                      Datatype.rem,
+                      Datatype.rem,
+                      Datatype.rem,
+                      Datatype.rem,
+                      Datatype.rem,
+                      Datatype.rem,
+                      Datatype.rem,
+                      Datatype.con,
+                      Datatype.rem,
+                      Datatype.lbl,
+                      Datatype.rem]
 
         subforum = {'Gezondheid': 0, 'Kinderen': 1, 'Psyche': 2}
         self.dicts = [subforum]
