@@ -21,15 +21,17 @@ class Preprocessor(object):
 
         #Build training set
         print('Start building training_set...')
-        (self.feature_sets, self.training_set, self.training_labels, self.training_header) = self.build_training_set(self.get_training_folds(self.folds, test_index), template, n_gram_degree, is_accumalative_n_gram, cut_off_freq, cut_off_max_size)
+        (feature_sets, self.training_set, self.training_labels, self.training_header) = self.build_training_set(self.get_training_folds(self.folds, test_index), template, n_gram_degree, is_accumalative_n_gram, cut_off_freq, cut_off_max_size)
         print('Finished building training_set...')
         
         #Build test set
         print('Start building test_set...')
-        (self.test_set, self.test_labels, self.test_header) = self.build_test_set(self.folds[test_index], template, self.feature_sets, n_gram_degree, is_accumalative_n_gram, cut_off_freq, cut_off_max_size)
+        (self.test_set, self.test_labels, self.test_header) = self.build_test_set(self.folds[test_index], template, feature_sets, n_gram_degree, is_accumalative_n_gram, cut_off_freq, cut_off_max_size)
         print('Finished building test_set...')
 
     def build_training_set(self, folds, template, n_gram_degree, is_accumalative_n_gram, cut_off_freq, cut_off_max_size):      
+        training_set = []
+        training_header = []
         #Loading raw data
         raw_data = []
         for fold in folds:
@@ -46,7 +48,7 @@ class Preprocessor(object):
         #2. Clean Raw Data
         print('2. Start cleaning raw data')
         #2.1 Clean Content Blocks
-        content_list = self.find_all_occurences_in_Datatype_list(pipeline.Datatype.con, template.types)
+        content_list = self.find_all_occurences_in_Datatype_list(pipeline.Datatype.content, template.types)
         raw_data = self.clear_content(raw_data, content_list, template)
         print('2.1 Cleaned content blocks')
 
@@ -60,11 +62,21 @@ class Preprocessor(object):
         
         #3.1.2. calculate feature values
         (content_feature_values, content_feature_header) = self.calculate_n_gram_feature_values(content_list, feature_sets, features_per_record)
+        training_set += content_feature_values
+        training_header += content_feature_header
         print('3.1.2. Calculated feature values and building of training set finished')
+
+        #3.2. Process Integers
+        #3.3. Process Booleans
+        #3.4. Process Standardized date and time
+        #3.5. Process Dictionairy
 
         return (feature_sets, training_set, training_labels, training_header)
 
     def build_test_set(self, fold, template, feature_sets, n_gram_degree, is_accumalative_n_gram, cut_off_freq, cut_off_max_size):
+        test_set = []
+        test_header = []
+
         #Loading raw data
         raw_data = []
         file = open(fold, 'r')
@@ -80,7 +92,7 @@ class Preprocessor(object):
         #2. Clean Raw Data
         print('2. Start cleaning raw data')
         #2.1 Clean Content Blocks
-        content_list = self.find_all_occurences_in_Datatype_list(pipeline.Datatype.con, template.types)
+        content_list = self.find_all_occurences_in_Datatype_list(pipeline.Datatype.content, template.types)
         raw_data = self.clear_content(raw_data, content_list, template)
         print('2.1 Cleaned content blocks')
 
@@ -92,9 +104,16 @@ class Preprocessor(object):
         (_, features_per_record) = self.create_n_gram_feature_sets(raw_data, content_list, n_gram_degree, is_accumalative_n_gram, cut_off_freq, cut_off_max_size, True)
         
         #3.1.2. calculate feature values and build training set
-        (test_set, test_header) = self.calculate_n_gram_feature_values(content_list, feature_sets, features_per_record)
+        (content_feature_values, content_feature_header) = self.calculate_n_gram_feature_values(content_list, feature_sets, features_per_record)
+        test_set += content_feature_values
+        test_header += content_feature_header
         print('3.1.2. Calculated feature values and building of training set finished')
 
+        #3.2. Process Integers
+        #3.3. Process Booleans
+        #3.4. Process Standardized date and time
+        #3.5. Process Dictionairy
+        
         return (test_set, test_labels, test_header)
 
     ## PIPELINE METHODS ##
@@ -118,17 +137,18 @@ class Preprocessor(object):
         #2.1-B.1 Tokenize content into words
         content = nltk.regexp_tokenize(content, r'\w+')
 
-        #2.1-B.2 Words to lower case
-        content = [word.lower() for word in content]
-
-        #2.1-B.3 Remove artifacts in content
+        #2.1-B.2 Remove artifacts in content
         for artefact in template.artefacts:
             content = [word.replace(artefact,'') for word in content]
+    
+        #2.1-B.3 Stem words
+        stemmer = nltk.stem.snowball.DutchStemmer()
+        content = [stemmer.stem(word) for word in content]
 
-        #2.1-B.4 Remove non-relevant instances (word size < 4)
-        content = [word for word in content if (len(word) >= 4)]
-        #and word not in nltk.corpus.stopwords.words('dutch'))
-        
+        #2.1-B.4 Remove stop words
+        #content = [word for word in content if (len(word) >= 4)]
+        content = [word for word in content if not word in set(nltk.corpus.stopwords.words('dutch'))]
+
         return content
 
     #3.
@@ -200,4 +220,18 @@ class Preprocessor(object):
             return folds[0:index]
         else:
             return folds[0:index] + folds[index+1:]
+
+    ## STATIC METHODS ##
+    def raw_to_nltk_format(feature_values, feature_header, labels):              
+        nltk_set = []
+        for record_number in range(0, len(feature_values[0][0])):        
+            record = dict()
+            for main_feature_category_index in range(0,len(feature_values)):
+                for sub_feature_category_index in range(0, len(feature_values[main_feature_category_index])):
+                    for feature_index in range(0, len(feature_values[main_feature_category_index][sub_feature_category_index][record_number])):
+                        record[feature_header[main_feature_category_index][sub_feature_category_index][feature_index]] = feature_values[main_feature_category_index][sub_feature_category_index][record_number][feature_index]
+            nltk_set.append((record, labels[record_number]))
+
+        return nltk_set
+
 

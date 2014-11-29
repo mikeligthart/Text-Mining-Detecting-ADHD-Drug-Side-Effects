@@ -3,17 +3,19 @@ import rivm
 import preprocessor
 import time
 
-preprocessor = preprocessor.Preprocessor()
-template = rivm.RIVM_template()
-#pipeline = pipeline.Pipeline(preprocessor, template)
-
-#Preprocessing
-#pipeline.preprocess(1, False, 'data/rivm/')
-
-#Analysing
-#pipeline.analyse(pipeline.data_save_location)
-#pipeline.train_and_test_classifier('data/rivm-preprocessed/')
-
 start = time.time()
-preprocessor.process('data/rivm/', 9, template, 3, True)
+## Settings ##
+data_location = 'data/rivm/'
+n_gram_degree = 1
+is_accumalative = False
+cut_off_freq = 2
+cut_off_max_size = 1000
+
+## Loading instances ##
+preproc = preprocessor.Preprocessor()
+template = rivm.RIVM_template()
+pipeline = pipeline.Pipeline(preproc, data_location, template)
+
+## Run ##
+(accuracy, precision, recall, f1) = pipeline.run(n_gram_degree, is_accumalative, cut_off_freq, cut_off_max_size)
 print('time: ' + repr(time.time() - start) + ' s')

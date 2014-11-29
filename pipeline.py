@@ -3,98 +3,56 @@ from enum import Enum
 import time
 import nltk
 from analyser import Analyser
+from preprocessor import Preprocessor
 
 class Pipeline(object):
 
     def __init__(self, preprocessor, data_location, template):
         self.preprocessor = preprocessor
-        self.data_loaction = data_location
+        self.data_location = data_location
         self.template = template
 
     def run(self, n_gram_degree=1, is_accumalative=False, cut_off_freq=2, cut_off_max_size=1000):
-        self.accuracy = []
-        self.precision = []
-        self.recall = []
-        self.f1 = []
+        accuracy = []
+        precision = []
+        recall = []
+        f1 = []
         for index in range(0,self.template.number_of_folds):
             print('== Preprocessing fold ' + repr(index+1) + ' out of ' + repr(self.template.number_of_folds) + ' ==')
             self.preprocessor.process(self.data_location, index, self.template, n_gram_degree, is_accumalative, cut_off_freq, cut_off_max_size)
 
-            self.training_set
-            self.test_set
+            print('Training Classifiers')
+            training_set = Preprocessor.raw_to_nltk_format(self.preprocessor.training_set, self.preprocessor.training_header, self.preprocessor.training_labels)
+            print('C.1. training Naive Bayes Classifier')
+            naive_bayes_classifier = nltk.NaiveBayesClassifier.train(training_set)
+            #print('C.2. training ')
+            #nltk.WekaClassifier.train(
 
-    def train_and_test_classifier(self, file_location):
-        self.accuracy = []
-        self.precision = []
-        self.recall = []
-        self.f1 = []
-        print('loading files for analyses')
-        #for index in range(0,self.template.number_of_folds):
-        file = open(file_location + 'train0' + '.pkl', 'rb')
-        training_set_raw = pickle.load(file)
-        file.close()
+            print('Classifying Test Set')
+            test_set = Preprocessor.raw_to_nltk_format(self.preprocessor.test_set, self.preprocessor.test_header, self.preprocessor.test_labels)
+            (test_features, true_labels) = zip(*test_set)
+            print('C.1. classifying with Naive Bayes')
+            naive_bayes_predicted_labels = naive_bayes_classifier.classify_many(test_features)
 
-        file = open(file_location + 'train_label0' + '.pkl', 'rb')
-        training_labels = pickle.load(file)
-        file.close()
+            print('Calculating accuracy, precesion, recall and f1')
+            print('Naive Bayes')
+            accuracy.append(Analyser.accuracy(naive_bayes_classifier, test_set))       
+            precision.append(Analyser.precision(true_labels, naive_bayes_predicted_labels))
+            recall.append(Analyser.recall(true_labels, naive_bayes_predicted_labels))
+            f1.append(Analyser.f1(true_labels, naive_bayes_predicted_labels)) 
 
-        file = open(file_location + 'header0' + '.pkl', 'rb')
-        headers = pickle.load(file)
-        file.close()
-        
-        file = open(file_location + 'test0' + '.pkl', 'rb')
-        test_set_raw = pickle.load(file)
-        file.close()
-
-        file = open(file_location + 'test_label0' + '.pkl', 'rb')
-        test_labels = pickle.load(file)
-        file.close()
-
-        print('start building training set')
-        self.training_set = self.raw_to_nltk_format(training_set_raw, headers, training_labels)
-
-        print('start building test set')
-        self.test_set = self.raw_to_nltk_format(test_set_raw, headers, test_labels)
-        
-        print('Train Naive Bayes Classifier')
-        classifier = nltk.NaiveBayesClassifier.train(self.training_set)
-
-        print('Calculate accuracy')
-        self.accuracy.append(Analyser.accuracy(classifier, self.test_set))
-
-        print('Calculate precision, recall and f1')
-        (test_features, true_labels) = zip(*self.test_set)
-        predicted_labels = classifier.classify_many(test_features)
-        self.precision.append(Analyser.precision(true_labels, predicted_labels))
-        self.recall.append(Analyser.recall(true_labels, predicted_labels))
-        self.f1.append(Analyser.f1(true_labels, predicted_labels))
-        
-        
-        
-    ##Helper methods##
-    def raw_to_nltk_format(self, raw, headers, labels):
-        nltk_set = []
-        for record_number in range(0, len(raw)):
-            record = dict()
-            for feature_number in range(0,len(raw[record_number])):
-                record[headers[feature_number]] = raw[record_number][feature_number]
-            nltk_set.append((record, labels[record_number]))
-        return nltk_set
-
+        return(accuracy, precision, recall, f1)
 
 class Datatype(Enum):
     """Enum capturing the different types of data present in various datasets"""
                                               
-    rem = 1 #remove
-    bln = 2 #boolean
-    itg = 3 #integer
-    dct = 4 #dictionairy
-    lbl = 5 #label
-    zdt = 6 #standardized date and time
-    sst = 7 #short string
-    con = 8 #textual content
-    ngram = 9 #ngram
-    ngram_feature = 10 #ngram_feature
+    skip = 1 #Don't build features from these raw data elements
+    label = 2 #label
+    integer = 3 #integer
+    boolean = 4 #boolean
+    time = 5 #standardized date and time
+    dictionairy = 6 #dictionairy
+    content = 7 #textual content
 
 class Template(object):
     """A template is used as a guide for preprocessing. It contains the names and types of the features (columns).

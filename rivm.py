@@ -20,19 +20,19 @@ class RIVM_template(Template):
                        self.label_name,
                        'topic_id']
 
-        self.types = [Datatype.rem,
-                      Datatype.rem,
-                      Datatype.rem,
-                      Datatype.rem,
-                      Datatype.rem,
-                      Datatype.rem,
-                      Datatype.rem,
-                      Datatype.rem,
-                      Datatype.con,
-                      Datatype.con,
-                      Datatype.rem,
-                      Datatype.lbl,
-                      Datatype.rem]
+        self.types = [Datatype.skip,
+                      Datatype.skip,
+                      Datatype.skip,
+                      Datatype.skip,
+                      Datatype.skip,
+                      Datatype.skip,
+                      Datatype.skip,
+                      Datatype.skip,
+                      Datatype.content,
+                      Datatype.content,
+                      Datatype.skip,
+                      Datatype.label,
+                      Datatype.skip]
 
         subforum = {'Gezondheid': 0, 'Kinderen': 1, 'Psyche': 2}
         self.dicts = [subforum]
