@@ -6,44 +6,22 @@ from analyser import Analyser
 
 class Pipeline(object):
 
-    def __init__(self, preprocessor, template):
+    def __init__(self, preprocessor, data_location, template):
         self.preprocessor = preprocessor
+        self.data_loaction = data_location
         self.template = template
 
-    def preprocess(self, n_gram_degree, is_accumalative, data_location):
-
-        self.data_save_location = data_location[0:len(data_location)-1] + '-preprocessed/'
-        
-        print('#### Starting preprocessing #####')
+    def run(self, n_gram_degree=1, is_accumalative=False, cut_off_freq=2, cut_off_max_size=1000):
+        self.accuracy = []
+        self.precision = []
+        self.recall = []
+        self.f1 = []
         for index in range(0,self.template.number_of_folds):
             print('== Preprocessing fold ' + repr(index+1) + ' out of ' + repr(self.template.number_of_folds) + ' ==')
-            self.preprocessor.process(data_location, index, self.template, n_gram_degree, is_accumalative)
+            self.preprocessor.process(self.data_location, index, self.template, n_gram_degree, is_accumalative, cut_off_freq, cut_off_max_size)
 
-            print('Saving training_set_' + repr(index) + '...')
-            file_train = open(self.data_save_location + 'train' + repr(index) + '.pkl', 'wb')
-            pickle.dump(self.preprocessor.training_set, file_train)
-            file_train.close()
-
-            file_train_label = open(self.data_save_location + 'train_label' + repr(index) + '.pkl', 'wb')
-            pickle.dump(self.preprocessor.labels_train, file_train_label)
-            file_train_label.close()
-            print('Saved')
-
-            print ('Savind header_' + repr(index) + '...')
-            file_header = open(self.data_save_location + 'header' + repr(index) + '.pkl', 'wb')
-            pickle.dump(self.preprocessor.headers, file_header)
-            file_header.close()
-
-            print('Saving test_set_' + repr(index) + '...')
-            file_test = open(self.data_save_location + 'test' + repr(index) + '.pkl', 'wb')
-            pickle.dump(self.preprocessor.test_set, file_test)
-            file_test.close()
-
-            file_test_label = open(self.data_save_location + 'test_label' + repr(index) + '.pkl', 'wb')
-            pickle.dump(self.preprocessor.labels_test, file_test_label)
-            file_test_label.close()
-            print('Saved')
-        print('#### Ppreprocessing finished #####')
+            self.training_set
+            self.test_set
 
     def train_and_test_classifier(self, file_location):
         self.accuracy = []
@@ -126,7 +104,7 @@ class Template(object):
     def __init__(self):
         self.delimiter = [] #The delimiter
         self.label_name = 'class_label'
-        self.headers = [] #Column/feature headers
+        self.header = [] #Column/feature headers
         self.types = [] #Types of the features
         self.dicts = [] #List of mappings of nominal data to int. Ordered from left to right column-wise
         self.label = {} #Labels

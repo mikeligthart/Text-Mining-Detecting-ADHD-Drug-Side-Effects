@@ -6,7 +6,7 @@ class RIVM_template(Template):
         super(RIVM_template,self).__init__()
         self.delimiter= '\t'
         
-        self.headers = ['id',
+        self.header = ['id',
                        'forum',
                        'sub_forum',
                        'topic_base_url',
@@ -28,7 +28,7 @@ class RIVM_template(Template):
                       Datatype.rem,
                       Datatype.rem,
                       Datatype.rem,
-                      Datatype.rem,
+                      Datatype.con,
                       Datatype.con,
                       Datatype.rem,
                       Datatype.lbl,

@@ -7,203 +7,188 @@ class Preprocessor(object):
 
     def __init__(self):
         self.training_set = []
-        self.labels_train = []
+        self.training_labels = []
+        self.training_header = []
         self.test_set = []
-        self.labels_test = []
-        self.headers = []
+        self.test_labels = []
+        self.test_header = []
          
-    def process(self, location, test_index, template, n_gram_degree=1, is_accumalative_n_gram=False):
+    def process(self, location, test_index, template, n_gram_degree=1, is_accumalative_n_gram=False, cut_off_freq=2, cut_off_max_size=1000):
 
-        #Set class attributes
-        self.template = template
-        headers = self.template.headers
-        types = self.template.types
+        #Retrieve process data and settings
         self.folds = os.listdir(location)
         self.folds[:] = [location + i for i in self.folds]
 
         #Build training set
         print('Start building training_set...')
-        self.build_training_set(self.get_training_folds(self.folds, test_index), n_gram_degree, is_accumalative_n_gram)
+        (self.feature_sets, self.training_set, self.training_labels, self.training_header) = self.build_training_set(self.get_training_folds(self.folds, test_index), template, n_gram_degree, is_accumalative_n_gram, cut_off_freq, cut_off_max_size)
         print('Finished building training_set...')
         
         #Build test set
         print('Start building test_set...')
-        self.build_test_set(self.folds[test_index], n_gram_degree, is_accumalative_n_gram)
+        (self.test_set, self.test_labels, self.test_header) = self.build_test_set(self.folds[test_index], template, self.feature_sets, n_gram_degree, is_accumalative_n_gram, cut_off_freq, cut_off_max_size)
         print('Finished building test_set...')
 
-    def build_training_set(self, folds, n_gram_degree, is_accumalative_n_gram):
-        headers = list(self.template.headers)
-        types = list(self.template.types)
-        
+    def build_training_set(self, folds, template, n_gram_degree, is_accumalative_n_gram, cut_off_freq, cut_off_max_size):      
         #Loading raw data
         raw_data = []
         for fold in folds:
             file = open(fold, 'r')
             for line in file.readlines():
-                raw_data.append(line.split(self.template.delimiter))
+                raw_data.append(line.split(template.delimiter))
             file.close()
 
         #Process raw data
         #1. obtain labels
-        (self.labels_train, raw_data) = self.obtain_labels(raw_data, headers, types)
+        training_labels = self.obtain_labels(raw_data, template)
         print('1. Obtained labels')
+        
+        #2. Clean Raw Data
+        print('2. Start cleaning raw data')
+        #2.1 Clean Content Blocks
+        content_list = self.find_all_occurences_in_Datatype_list(pipeline.Datatype.con, template.types)
+        raw_data = self.clear_content(raw_data, content_list, template)
+        print('2.1 Cleaned content blocks')
 
-        #2. removing features that are marked for removal
-        remove_list = self.find_all_occurences_in_Datatype_list(pipeline.Datatype.rem, types)
-        raw_data = self.remove_features(raw_data, remove_list, headers, types)
-        print('2. Removed unrequired features')
+        #3. Process Raw Data into Training Set
+        print('3. Start processing raw data into training set')
+        #3.1 Process Content Blocks
+        print('3.1 Start processing content blocks')
+        #3.1.1 Create n-gram feature sets from content blocks
+        (feature_sets, features_per_record) = self.create_n_gram_feature_sets(raw_data, content_list, n_gram_degree, is_accumalative_n_gram, cut_off_freq, cut_off_max_size)
+        print('3.1.1 Created n-gram feature sets')
         
-        #3. Clean content
-        content_list = self.find_all_occurences_in_Datatype_list(pipeline.Datatype.con, types)
-        (raw_data, self.featureset, feature_list) = self.clear_content_and_initialize_featureset(raw_data, content_list)
-        print('3. Cleared content')
-        
-        #4. Create n-grams and featuresets
-        if n_gram_degree > 1:
-            (raw_data, self.featureset, feature_list, headers, types) = self.create_ngrams_and_featuresets(raw_data, self.featureset, is_accumalative_n_gram, n_gram_degree, content_list, feature_list, headers, types)
-        feature_start_index = len(raw_data[0])
-        print('4. Created n-grams and initialized featuresets')
-        
-        #5. calculate feature values and build training set
-        for content_index in range(0,len(content_list)):
-            for feature_index in range(0,len(self.featureset[0])):
-                featureset_to_data_index = feature_list[content_index][feature_index]
-                features = self.featureset[content_index][feature_index] 
-                (self.training_set, self.headers) = self.calculate_feature_values(raw_data, features, featureset_to_data_index)     
-        print('5. Calculated feature values and building of training set finished')
+        #3.1.2. calculate feature values
+        (content_feature_values, content_feature_header) = self.calculate_n_gram_feature_values(content_list, feature_sets, features_per_record)
+        print('3.1.2. Calculated feature values and building of training set finished')
 
-    def build_test_set(self, fold, n_gram_degree, is_accumalative_n_gram):
-        headers = list(self.template.headers)
-        types = list(self.template.types)
-        
-        #loading raw data
+        return (feature_sets, training_set, training_labels, training_header)
+
+    def build_test_set(self, fold, template, feature_sets, n_gram_degree, is_accumalative_n_gram, cut_off_freq, cut_off_max_size):
+        #Loading raw data
         raw_data = []
         file = open(fold, 'r')
         for line in file.readlines():
-            raw_data.append(line.split(self.template.delimiter))
+            raw_data.append(line.split(template.delimiter))
         file.close()
 
         #Process raw data
         #1. obtain labels
-        (self.labels_test, raw_data) = self.obtain_labels(raw_data, headers, types)
+        test_labels = self.obtain_labels(raw_data, template)
+        print('1. Obtained labels')
 
-        #2. removing features that are marked for removal
-        remove_list = self.find_all_occurences_in_Datatype_list(pipeline.Datatype.rem, types)
-        raw_data = self.remove_features(raw_data, remove_list, headers, types)
+        #2. Clean Raw Data
+        print('2. Start cleaning raw data')
+        #2.1 Clean Content Blocks
+        content_list = self.find_all_occurences_in_Datatype_list(pipeline.Datatype.con, template.types)
+        raw_data = self.clear_content(raw_data, content_list, template)
+        print('2.1 Cleaned content blocks')
 
-        #3. Clean content
-        content_list = self.find_all_occurences_in_Datatype_list(pipeline.Datatype.con, types)
-        (raw_data, _, feature_list) = self.clear_content_and_initialize_featureset(raw_data, content_list)
-
-        #4. Create n-grams and featuresets
-        if n_gram_degree > 1:
-            (raw_data, _, feature_list, headers, types) = self.create_ngrams_and_featuresets(raw_data, self.featureset, is_accumalative_n_gram, n_gram_degree, content_list, feature_list, headers, types)
-        feature_start_index = len(raw_data[0])
-
-        #5. calculate feature values and build test set
-        for content_index in range(0,len(content_list)):
-            for feature_index in range(0,len(feature_list[0])):
-                featureset_to_data_index = feature_list[content_index][feature_index]
-                features = self.featureset[content_index][feature_index] 
-                (self.test_set, _) = self.calculate_feature_values(raw_data, features, featureset_to_data_index)
+        #3. Process Raw Data into Training Set
+        print('3. Start processing raw data into training set')
+        #3.1 Process Content Blocks
+        print('3.1 Start processing content blocks')
+        #3.1.1 calculate features per record
+        (_, features_per_record) = self.create_n_gram_feature_sets(raw_data, content_list, n_gram_degree, is_accumalative_n_gram, cut_off_freq, cut_off_max_size, True)
         
+        #3.1.2. calculate feature values and build training set
+        (test_set, test_header) = self.calculate_n_gram_feature_values(content_list, feature_sets, features_per_record)
+        print('3.1.2. Calculated feature values and building of training set finished')
+
+        return (test_set, test_labels, test_header)
+
     ## PIPELINE METHODS ##
     #1.
-    def obtain_labels(self, raw_data, headers, types):
+    def obtain_labels(self, raw_data, template):
         labels = []
-        label_index = headers.index(self.template.label_name)
+        label_index = template.header.index(template.label_name)
         for index in range(0,len(raw_data)):
             labels.append(raw_data[index][label_index])
-            del raw_data[index][label_index]
-        del headers[label_index]
-        del types[label_index]
-        return (labels, raw_data)
+        return labels
 
     #2.
-    def remove_features(self, raw_data, remove_list, headers, types):
-        remove_list.sort(reverse=True)
-        for rem in remove_list:
-            for index in range(0, len(raw_data)):
-                del raw_data[index][rem]
-            del headers[rem]
-            del types[rem]
-        return raw_data
-
-    #3.
-    #3.1
-    def clear_content_and_initialize_featureset(self, raw_data, content_list):
-        featureset =[[] for i in range(0, len(content_list))]
-        feature_list = [[] for i in range(0, len(content_list))]
-        content_index = 0
-        for content_item in content_list:
-            monograms = set()
+    #2.1-A
+    def clear_content(self, raw_data, content_list, template):
+        for content_index in range(0, len(content_list)):
             for index in range(0,len(raw_data)):          
-                raw_data[index][content_item] = self.clean_content_box(raw_data[index][content_item])
-                monograms = monograms | raw_data[index][content_item]
-            featureset[content_index].append(list(monograms))
-            feature_list[content_index].append(content_item)
-            
-            content_index += 1
-        return (raw_data, featureset, feature_list)
-    
-    #3.2
-    def clean_content_box(self, content):
-        #3.2.1 Tokenize content into words
+                raw_data[index][content_list[content_index]] = self.clean_content_box(raw_data[index][content_list[content_index]], template)
+        return raw_data
+    #2.1-B
+    def clean_content_box(self, content, template):
+        #2.1-B.1 Tokenize content into words
         content = nltk.regexp_tokenize(content, r'\w+')
 
-        #3.2.2 Words to lower case
+        #2.1-B.2 Words to lower case
         content = [word.lower() for word in content]
 
-        #3.2.3 Remove artifacts in content
-        for artefact in self.template.artefacts:
+        #2.1-B.3 Remove artifacts in content
+        for artefact in template.artefacts:
             content = [word.replace(artefact,'') for word in content]
 
-        #3.2.4 Remove non-relevant instances (word size < 4)
+        #2.1-B.4 Remove non-relevant instances (word size < 4)
         content = [word for word in content if (len(word) >= 4)]
         #and word not in nltk.corpus.stopwords.words('dutch'))
         
-        return set(content)
+        return content
 
-    #4.
-    def create_ngrams_and_featuresets(self, raw_data, featureset, is_accumalative_n_gram, n_gram_degree, content_list, feature_list, headers, types):
-        if is_accumalative_n_gram:
-            for n in range(2,n_gram_degree+1):
-                (raw_data, featureset, feature_list, headers, types) = self.create_ngram_per_n_and_featureset(raw_data, featureset, n, content_list, feature_list, headers, types)
+    #3.
+    #3.1.1-A
+    def create_n_gram_feature_sets(self, raw_data, content_list, n_gram_degree, is_accumalative_n_gram, cut_off_freq, cut_off_max_size, is_for_test_set=False):
+        complete_features_sets = [[] for i in range(0, len(content_list))]
+        complete_features_per_record = [[] for i in range(0, len(content_list))]
+        
+        for content_index in range(0, len(content_list)):
+            if is_accumalative_n_gram:
+                for n in range(1,n_gram_degree+1):
+                    (feature_sets, features_per_record) = self.create_n_gram_feature_set_per_ngram(raw_data, content_list[content_index], n, cut_off_freq, cut_off_max_size, is_for_test_set)
+                    complete_features_sets[content_index].append(feature_sets)
+                    complete_features_per_record[content_index].append(features_per_record)
+            else:
+                    (feature_sets, features_per_record) = self.create_n_gram_feature_set_per_ngram(raw_data, content_list[content_index], n_gram_degree, cut_off_freq, cut_off_max_size, is_for_test_set)
+                    complete_features_sets[content_index].append(feature_sets)
+                    complete_features_per_record[content_index].append(features_per_record)
+
+        return (complete_features_sets, complete_features_per_record)
+
+    #3.1.1-B
+    def create_n_gram_feature_set_per_ngram(self, raw_data, content_item, n_gram_degree, cut_off_freq, cut_off_max_size, is_for_test_set):
+        features = []
+        features_per_record = []
+
+        for index in range(0,len(raw_data)):                    
+            ngrams = list(nltk.ngrams(raw_data[index][content_item], n_gram_degree))
+            features += ngrams
+            features_per_record.append(ngrams)
+
+        if is_for_test_set:
+            return (None, features_per_record)
         else:
-            (raw_data, featureset, feature_list, headers, types) = self.create_ngram_per_n_and_featureset(raw_data, featureset, n_gram_degree, content_list, feature_list, headers, types)
+            freq_features = {k:v for (k,v) in nltk.FreqDist(features).items() if v >= cut_off_freq}
+            if len(freq_features) <= cut_off_max_size:
+                features = list(freq_features.keys())
+            else:
+                features = list(freq_features.keys())[0:cut_off_max_size]
+            return (features, features_per_record)
 
-        return (raw_data, featureset, feature_list, headers, types)
+    
 
-    def create_ngram_per_n_and_featureset(self, raw_data, featureset, n_gram_degree, content_list, feature_list, headers, types):
-        content_index = 0
-        for content_item in content_list:
-            features = set()
-            for index in range(0,len(raw_data)):                    
-                ngrams = set(nltk.ngrams(raw_data[index][content_item], n_gram_degree))
-                raw_data[index].append(ngrams)
-                features = features | ngrams
-            featureset[content_index].append(list(features))
-            feature_list[content_index].append(len(raw_data[index])-1)
-            headers.append(repr(n_gram_degree) + '_gram' + 'con_' + repr(content_item))
-            types.append(pipeline.Datatype.ngram)
-            content_index += 1
-        return (raw_data, featureset, feature_list, headers, types)
-
-    #5.
-    def calculate_feature_values(self, raw_data, features, featureset_to_data_index):
-        headers = []
-        train_test_set = []
-        for index in range(0, len(raw_data)):
-            train_test_set.append([])
-            
-        for index in range(0, len(features)):
-            for data_index in range(0, len(raw_data)):
-                if features[index] in raw_data[data_index][featureset_to_data_index]:
-                    train_test_set[data_index].append(1)
-                else:
-                    train_test_set[data_index].append(0)
-            headers.append(features[index])
-        return (train_test_set, headers)
+    #3.1.2
+    def calculate_n_gram_feature_values(self, content_list, feature_sets, features_per_record):
+        feature_values = [[[[[] for l in range(0,len(feature_sets[i][j]))] for k in range(0, len(features_per_record[i][j]))] for j in range(0, len(feature_sets[i]))] for i in range(0, len(content_list))]
+        headers = [[[[] for l in range(0,len(feature_sets[i][j]))] for j in range(0, len(feature_sets[i]))] for i in range(0, len(content_list))]
+        for content_index in range(0,len(content_list)):
+            for n_gram_index in range(0,len(feature_sets[content_index])):
+                word_index = 0
+                for word in feature_sets[content_index][n_gram_index]:
+                    for data_index in range(0, len(features_per_record[content_index][n_gram_index])):
+                        if word in features_per_record[content_index][n_gram_index][data_index]:
+                            feature_values[content_index][n_gram_index][data_index][word_index] = 1
+                        else:
+                            feature_values[content_index][n_gram_index][data_index][word_index] = 0
+                    headers[content_index][n_gram_index][word_index] = word
+                    word_index += 1
+                        
+        return (feature_values, headers)
 
 
     ## HELPER METHODS ##
