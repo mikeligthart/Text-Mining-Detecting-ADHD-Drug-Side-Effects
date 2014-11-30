@@ -1,4 +1,5 @@
-from pipeline import Template, Datatype
+from pipeline import Template
+from preprocessor import Datatype
 
 class RIVM_template(Template):
 
@@ -28,7 +29,7 @@ class RIVM_template(Template):
                       Datatype.skip,
                       Datatype.skip,
                       Datatype.skip,
-                      Datatype.content,
+                      Datatype.skip,
                       Datatype.content,
                       Datatype.skip,
                       Datatype.label,
@@ -38,7 +39,5 @@ class RIVM_template(Template):
         self.dicts = [subforum]
 
         self.label = {'f':0, 't':1}
-
-        self.artefacts = ['\\n']
 
         self.number_of_folds = 10

@@ -1,7 +1,7 @@
 import nltk
-import pipeline
 import os
 from enum import Enum
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 class Preprocessor(object):
 
@@ -13,21 +13,21 @@ class Preprocessor(object):
         self.test_labels = []
         self.test_header = []
          
-    def process(self, location, test_index, template, n_gram_degree=1, is_accumalative_n_gram=False, cut_off_freq=2, cut_off_max_size=1000):
+    def process(self, location, test_index, template, n_gram_degree=1, is_accumalative_n_gram=False, cut_off_freq=1, cut_off_max_size=1000):
 
         #Retrieve process data and settings
         self.folds = os.listdir(location)
         self.folds[:] = [location + i for i in self.folds]
 
         #Build training set
-        print('Start building training_set...')
-        (feature_sets, self.training_set, self.training_labels, self.training_header) = self.build_training_set(self.get_training_folds(self.folds, test_index), template, n_gram_degree, is_accumalative_n_gram, cut_off_freq, cut_off_max_size)
-        print('Finished building training_set...')
+        print('Start building training_set.')
+        (self.feature_sets, self.training_set, self.training_labels, self.training_header) = self.build_training_set(self.get_training_folds(self.folds, test_index), template, n_gram_degree, is_accumalative_n_gram, cut_off_freq, cut_off_max_size)
+        print('Finished building training_set.')
         
         #Build test set
-        print('Start building test_set...')
-        (self.test_set, self.test_labels, self.test_header) = self.build_test_set(self.folds[test_index], template, feature_sets, n_gram_degree, is_accumalative_n_gram, cut_off_freq, cut_off_max_size)
-        print('Finished building test_set...')
+        print('Start building test_set.')
+        (self.test_set, self.test_labels, self.test_header) = self.build_test_set(self.folds[test_index], template, self.feature_sets, n_gram_degree, is_accumalative_n_gram, cut_off_freq, cut_off_max_size)
+        print('Finished building test_set.')
 
     def build_training_set(self, folds, template, n_gram_degree, is_accumalative_n_gram, cut_off_freq, cut_off_max_size):      
         training_set = []
@@ -42,34 +42,28 @@ class Preprocessor(object):
 
         #Process raw data
         #1. obtain labels
+        print('1. Obtaining labels.')
         training_labels = self.obtain_labels(raw_data, template)
-        print('1. Obtained labels')
-        
-        #2. Clean Raw Data
-        print('2. Start cleaning raw data')
-        #2.1 Clean Content Blocks
-        content_list = self.find_all_occurences_in_Datatype_list(pipeline.Datatype.content, template.types)
-        raw_data = self.clear_content(raw_data, content_list, template)
-        print('2.1 Cleaned content blocks')
-
-        #3. Process Raw Data into Training Set
-        print('3. Start processing raw data into training set')
-        #3.1 Process Content Blocks
-        print('3.1 Start processing content blocks')
-        #3.1.1 Create n-gram feature sets from content blocks
+       
+        #2. Process Raw Data into Training Set
+        print('2. Start processing raw data into training set')
+        #2.1 Process Content Blocks
+        print('2.1 Start processing content blocks')
+        content_list = self.find_all_occurences_in_Datatype_list(Datatype.content, template.types)
+        #2.1.1 Create n-gram feature sets from content blocks
+        print('2.1.1 Creating n-gram feature sets')
         (feature_sets, features_per_record) = self.create_n_gram_feature_sets(raw_data, content_list, n_gram_degree, is_accumalative_n_gram, cut_off_freq, cut_off_max_size)
-        print('3.1.1 Created n-gram feature sets')
         
-        #3.1.2. calculate feature values
+        #2.1.2. calculate feature values
+        print('2.1.2. Calculating content n-gram feature values')
         (content_feature_values, content_feature_header) = self.calculate_n_gram_feature_values(content_list, feature_sets, features_per_record)
         training_set += content_feature_values
         training_header += content_feature_header
-        print('3.1.2. Calculated feature values and building of training set finished')
 
-        #3.2. Process Integers
-        #3.3. Process Booleans
-        #3.4. Process Standardized date and time
-        #3.5. Process Dictionairy
+        #2.2. Process Integers
+        #2.3. Process Booleans
+        #2.4. Process Standardized date and time
+        #2.5. Process Dictionairy
 
         return (feature_sets, training_set, training_labels, training_header)
 
@@ -86,33 +80,27 @@ class Preprocessor(object):
 
         #Process raw data
         #1. obtain labels
+        print('1. Obtaining labels.')
         test_labels = self.obtain_labels(raw_data, template)
-        print('1. Obtained labels')
 
-        #2. Clean Raw Data
-        print('2. Start cleaning raw data')
-        #2.1 Clean Content Blocks
-        content_list = self.find_all_occurences_in_Datatype_list(pipeline.Datatype.content, template.types)
-        raw_data = self.clear_content(raw_data, content_list, template)
-        print('2.1 Cleaned content blocks')
-
-        #3. Process Raw Data into Training Set
-        print('3. Start processing raw data into training set')
-        #3.1 Process Content Blocks
-        print('3.1 Start processing content blocks')
-        #3.1.1 calculate features per record
-        (_, features_per_record) = self.create_n_gram_feature_sets(raw_data, content_list, n_gram_degree, is_accumalative_n_gram, cut_off_freq, cut_off_max_size, True)
+        #2. Process Raw Data into Training Set
+        print('2. Start processing raw data into test set')
+        #2.1 Process Content Blocks
+        print('2.1 Start processing content blocks')
+        content_list = self.find_all_occurences_in_Datatype_list(Datatype.content, template.types) 
+        #2.1.1 calculate features per record
+        features_per_record = self.create_n_gram_features_per_record(raw_data, content_list, n_gram_degree, is_accumalative_n_gram)
         
-        #3.1.2. calculate feature values and build training set
+        #2.1.2. calculate feature values and build training set
+        print('2.1.2. Calculating content n-gram feature values')
         (content_feature_values, content_feature_header) = self.calculate_n_gram_feature_values(content_list, feature_sets, features_per_record)
         test_set += content_feature_values
         test_header += content_feature_header
-        print('3.1.2. Calculated feature values and building of training set finished')
 
-        #3.2. Process Integers
-        #3.3. Process Booleans
-        #3.4. Process Standardized date and time
-        #3.5. Process Dictionairy
+        #2.2. Process Integers
+        #2.3. Process Booleans
+        #2.4. Process Standardized date and time
+        #2.5. Process Dictionairy
         
         return (test_set, test_labels, test_header)
 
@@ -123,76 +111,65 @@ class Preprocessor(object):
         label_index = template.header.index(template.label_name)
         for index in range(0,len(raw_data)):
             labels.append(raw_data[index][label_index])
-        return labels
+        return labels      
 
     #2.
-    #2.1-A
-    def clear_content(self, raw_data, content_list, template):
-        for content_index in range(0, len(content_list)):
-            for index in range(0,len(raw_data)):          
-                raw_data[index][content_list[content_index]] = self.clean_content_box(raw_data[index][content_list[content_index]], template)
-        return raw_data
-    #2.1-B
-    def clean_content_box(self, content, template):
-        #2.1-B.1 Tokenize content into words
-        content = nltk.regexp_tokenize(content, r'\w+')
+    #2.1.1-A
+    def create_n_gram_feature_sets(self, raw_data, content_list, n_gram_degree, is_accumalative_n_gram, cut_off_freq, cut_off_max_size):
+        if is_accumalative_n_gram:
+            complete_features_sets = [[[] for j in range(0,n_gram_degree)] for i in range(0, len(content_list))]
+            vectorizer = TfidfVectorizer(tokenizer=Preprocessor.tokenize, stop_words=nltk.corpus.stopwords.words('dutch'), min_df=cut_off_freq, ngram_range=(1,n_gram_degree), max_features=cut_off_max_size)
+        else:
+            complete_features_sets = [[[]] for i in range(0, len(content_list))]
+            vectorizer = TfidfVectorizer(tokenizer=Preprocessor.tokenize, stop_words=nltk.corpus.stopwords.words('dutch'), min_df=cut_off_freq, ngram_range=(n_gram_degree,n_gram_degree), max_features=cut_off_max_size)
 
-        #2.1-B.2 Remove artifacts in content
-        for artefact in template.artefacts:
-            content = [word.replace(artefact,'') for word in content]
-    
-        #2.1-B.3 Stem words
-        stemmer = nltk.stem.snowball.DutchStemmer()
-        content = [stemmer.stem(word) for word in content]
-
-        #2.1-B.4 Remove stop words
-        #content = [word for word in content if (len(word) >= 4)]
-        content = [word for word in content if not word in set(nltk.corpus.stopwords.words('dutch'))]
-
-        return content
-
-    #3.
-    #3.1.1-A
-    def create_n_gram_feature_sets(self, raw_data, content_list, n_gram_degree, is_accumalative_n_gram, cut_off_freq, cut_off_max_size, is_for_test_set=False):
-        complete_features_sets = [[] for i in range(0, len(content_list))]
-        complete_features_per_record = [[] for i in range(0, len(content_list))]
-        
-        for content_index in range(0, len(content_list)):
+        for content_index in range(0,len(content_list)):
+            content_column = [row[content_list[content_index]] for row in raw_data]
+            vectorizer.fit(content_column)
             if is_accumalative_n_gram:
-                for n in range(1,n_gram_degree+1):
-                    (feature_sets, features_per_record) = self.create_n_gram_feature_set_per_ngram(raw_data, content_list[content_index], n, cut_off_freq, cut_off_max_size, is_for_test_set)
-                    complete_features_sets[content_index].append(feature_sets)
-                    complete_features_per_record[content_index].append(features_per_record)
+                if n_gram_degree > 1:
+                    mixed_feature_sets = vectorizer.get_feature_names()
+                    for n in range(0, n_gram_degree):
+                        ngrams = [ngram for ngram in mixed_feature_sets if ngram.count(' ') == n]
+                        complete_features_sets[content_index][n] = ngrams
+                else:
+                    complete_features_sets[content_index][0] = vectorizer.get_feature_names()
             else:
-                    (feature_sets, features_per_record) = self.create_n_gram_feature_set_per_ngram(raw_data, content_list[content_index], n_gram_degree, cut_off_freq, cut_off_max_size, is_for_test_set)
-                    complete_features_sets[content_index].append(feature_sets)
-                    complete_features_per_record[content_index].append(features_per_record)
+                complete_features_sets[content_index][0] = vectorizer.get_feature_names()
+            
+            
 
+        complete_features_per_record = self.create_n_gram_features_per_record(raw_data, content_list, n_gram_degree, is_accumalative_n_gram)
         return (complete_features_sets, complete_features_per_record)
 
-    #3.1.1-B
-    def create_n_gram_feature_set_per_ngram(self, raw_data, content_item, n_gram_degree, cut_off_freq, cut_off_max_size, is_for_test_set):
-        features = []
-        features_per_record = []
+    #2.1.1-B
+    def create_n_gram_features_per_record(self, raw_data, content_list, n_gram_degree, is_accumalative_n_gram):        
+        complete_features_per_record = [[] for i in range(0, len(content_list))]
+        for content_index in range(0,len(content_list)):
+            complete_features_per_record[content_index].append([])
+            for data_index in range(0,len(raw_data)):          
+                complete_features_per_record[content_index][0].append(Preprocessor.tokenize(raw_data[data_index][content_list[content_index]]))        
 
-        for index in range(0,len(raw_data)):                    
-            ngrams = list(nltk.ngrams(raw_data[index][content_item], n_gram_degree))
-            features += ngrams
-            features_per_record.append(ngrams)
-
-        if is_for_test_set:
-            return (None, features_per_record)
-        else:
-            freq_features = {k:v for (k,v) in nltk.FreqDist(features).items() if v >= cut_off_freq}
-            if len(freq_features) <= cut_off_max_size:
-                features = list(freq_features.keys())
+            if is_accumalative_n_gram:
+                for n in range(2,n_gram_degree+1):
+                    features_per_record = self.create_n_gram_feature_per_record_per_ngram(complete_features_per_record[content_index][0], n)
+                    complete_features_per_record[content_index].append(features_per_record)
             else:
-                features = list(freq_features.keys())[0:cut_off_max_size]
-            return (features, features_per_record)
+                if n_gram_degree > 1:
+                        complete_features_per_record[content_index][0] = self.create_n_gram_feature_per_record_per_ngram(complete_features_per_record[content_index][0], n_gram_degree)
+        self.complete_features_per_record = complete_features_per_record
+        return complete_features_per_record
 
-    
+    #2.1.1-C
+    def create_n_gram_feature_per_record_per_ngram(self, monograms_per_record, n_gram_degree):
+        features_per_record = []
+        for record in monograms_per_record:                    
+            ngrams = list(nltk.ngrams(record, n_gram_degree))
+            ngrams = list(map(Preprocessor.nltk_ngrams_to_nklearn, ngrams))
+            features_per_record.append(ngrams)
+        return features_per_record
 
-    #3.1.2
+    #2.1.2
     def calculate_n_gram_feature_values(self, content_list, feature_sets, features_per_record):
         feature_values = [[[[[] for l in range(0,len(feature_sets[i][j]))] for k in range(0, len(features_per_record[i][j]))] for j in range(0, len(feature_sets[i]))] for i in range(0, len(content_list))]
         headers = [[[[] for l in range(0,len(feature_sets[i][j]))] for j in range(0, len(feature_sets[i]))] for i in range(0, len(content_list))]
@@ -233,5 +210,40 @@ class Preprocessor(object):
             nltk_set.append((record, labels[record_number]))
 
         return nltk_set
+
+    def nltk_ngrams_to_nklearn(tpl):
+        result = tpl[0]
+        for i in range(1,len(tpl)):
+            result += ' '
+            result += tpl[i]
+            return result
+
+    def tokenize(content):
+        #Define Artefacts
+        artefacts = ['\\n']
+        
+        #Tokenize content into words
+        content = nltk.regexp_tokenize(content, r'\w+')
+
+        #Remove artifacts in content
+        for artefact in artefacts:
+            content = [word.replace(artefact,'') for word in content]
+    
+        #Stem words
+        stemmer = nltk.stem.snowball.DutchStemmer()
+        content = [stemmer.stem(word) for word in content]
+
+        return content
+
+class Datatype(Enum):
+    """Enum capturing the different types of data present in various datasets"""
+                                              
+    skip = 1 #Don't build features from these raw data elements
+    label = 2 #label
+    integer = 3 #integer
+    boolean = 4 #boolean
+    time = 5 #standardized date and time
+    dictionairy = 6 #dictionairy
+    content = 7 #textual content
 
 
