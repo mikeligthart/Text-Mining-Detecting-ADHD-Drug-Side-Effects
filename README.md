@@ -3,8 +3,8 @@ Text Mining: Detecting ADHD Drug Side Effects in Forum Posts
 Source code to Ligthart, Mike, Text Mining: Detecting ADHD Drug Side Effects in Forum Posts, Text Mining Midterm Paper (LET-REMA-LCEX06), Radboud University, 2014
 
 A. Generate results reported in paper
-* Add RIVM folds to folder '/data/rivm/
-* Run main.py - results will be outputted to terminal
+* Add RIVM data folds to folder '/data/rivm/
+* Run main.py - results will be outputted in the terminal
 
 B. Explanation of the code.
 The old code:
