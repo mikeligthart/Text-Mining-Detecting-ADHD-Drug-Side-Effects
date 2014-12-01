@@ -1,7 +1,9 @@
 import nltk
 from sklearn.svm import LinearSVC
+from sklearn.neighbors import KNeighborsClassifier
 from analyser import Analyser
 from preprocessor import Preprocessor
+
 
 class Pipeline(object):
 
@@ -11,15 +13,14 @@ class Pipeline(object):
         self.template = template
 
     def run(self, n_gram_degree=1, is_accumalative=False, cut_off_freq=1, cut_off_max_size=1000):
-        result_header = ['C.1. Naive Bayes Classifier', 'C.2. Support Vector Machine']
-        accuracy = [[],[]]
-        precision = [[],[]]
-        recall = [[],[]]
-        f1 = [[],[]]
+        result_header = ['C.1. Naive Bayes Classifier', 'C.2. Support Vector Machine', 'C.3. Decision Tree', 'C.4. k-NN']
+        accuracy = [[] for n in range(0,len(result_header))]
+        precision = [[] for n in range(0,len(result_header))]
+        recall = [[] for n in range(0,len(result_header))]
+        f1 = [[] for n in range(0,len(result_header))]
+        
         print('**** Starting a ' + repr(self.template.number_of_folds) + '-fold cross validation analyses for findind the best classifier ****')
-        index = 7
-        if index == 7:
-        #for index in range(0,self.template.number_of_folds):
+        for index in range(0,self.template.number_of_folds):
             print('== Preprocessing fold ' + repr(index+1) + ' out of ' + repr(self.template.number_of_folds) + ' ==')
             self.preprocessor.process(self.data_location, index, self.template, n_gram_degree, is_accumalative, cut_off_freq, cut_off_max_size)
 
@@ -29,10 +30,10 @@ class Pipeline(object):
             naive_bayes_classifier = nltk.NaiveBayesClassifier.train(training_set)
             print('C.2. training Support Vector Machine')
             svm_classifier = nltk.classify.scikitlearn.SklearnClassifier(LinearSVC()).train(training_set)
-            #print('C.3. training Decision Tree Classifier')
-            #decision_tree_classifier = nltk.DecisionTreeClassifier.train(training_set)
-            #print('C.4. training Max Entropy')
-            #maxent_classifier = nltk.MaxentClassifier.train(training_set)
+            print('C.3. training Decision Tree Classifier')
+            decision_tree_classifier = nltk.DecisionTreeClassifier.train(training_set)
+            print('C.4. training k-NN Classifier')
+            knn_classifier = nltk.classify.scikitlearn.SklearnClassifier(KNeighborsClassifier()).train(training_set)
 
             print('Classifying Test Set')
             test_set = Preprocessor.raw_to_nltk_format(self.preprocessor.test_set, self.preprocessor.test_header, self.preprocessor.test_labels)
@@ -41,11 +42,11 @@ class Pipeline(object):
             naive_bayes_predicted_labels = naive_bayes_classifier.classify_many(test_features)
             print('C.2. classifying with Support Vector Machine')
             svm_predicted_labels = svm_classifier.classify_many(test_features)
-            #print('C.3. classifying with Decision Tree Classifier')
-            #decision_tree_predicted_labels = decision_tree_classifier.classify_many(test_features)
-            #print('C.4. classifying with Max Entropy')
-            #maxent_predicted_labels = maxent_classifier.classify_many(test_features)
-            
+            print('C.3. classifying with Decision Tree Classifier')
+            decision_tree_predicted_labels = decision_tree_classifier.classify_many(test_features)
+            print('C.4. classifying k-NN')
+            knn_predicted_labels = knn_classifier.classify_many(test_features)
+
             print('Calculating accuracy, precesion, recall and f1')
             print('C.1. Naive Bayes')
             accuracy[0].append(Analyser.accuracy(naive_bayes_classifier, test_set))       
@@ -57,18 +58,17 @@ class Pipeline(object):
             precision[1].append(Analyser.precision(true_labels, svm_predicted_labels))
             recall[1].append(Analyser.recall(true_labels, svm_predicted_labels))
             f1[1].append(Analyser.f1(true_labels, svm_predicted_labels))
-            """
             print('C.3. Decision Tree')
             accuracy[2].append(Analyser.accuracy(decision_tree_classifier, test_set))       
             precision[2].append(Analyser.precision(true_labels, decision_tree_predicted_labels))
             recall[2].append(Analyser.recall(true_labels, decision_tree_predicted_labels))
             f1[2].append(Analyser.f1(true_labels, decision_tree_predicted_labels))
-            print('C.3. Max Entropy')
-            accuracy[3].append(Analyser.accuracy(maxent_classifier, test_set))       
-            precision[3].append(Analyser.precision(true_labels, maxent_predicted_labels))
-            recall[3].append(Analyser.recall(true_labels, maxent_predicted_labels))
-            f1[3].append(Analyser.f1(true_labels, maxent_predicted_labels))
-            """
+            print('C.4. k-NN')
+            accuracy[3].append(Analyser.accuracy(knn_classifier, test_set))       
+            precision[3].append(Analyser.precision(true_labels, knn_predicted_labels))
+            recall[3].append(Analyser.recall(true_labels, knn_predicted_labels))
+            f1[3].append(Analyser.f1(true_labels, knn_predicted_labels))
+            
         print('**** Finished with analyses *****')
         return(accuracy, precision, recall, f1, result_header)
 

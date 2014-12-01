@@ -118,28 +118,29 @@ class Preprocessor(object):
     def create_n_gram_feature_sets(self, raw_data, content_list, n_gram_degree, is_accumalative_n_gram, cut_off_freq, cut_off_max_size):
         if is_accumalative_n_gram:
             complete_features_sets = [[[] for j in range(0,n_gram_degree)] for i in range(0, len(content_list))]
-            vectorizer = TfidfVectorizer(tokenizer=Preprocessor.tokenize, stop_words=nltk.corpus.stopwords.words('dutch'), min_df=cut_off_freq, ngram_range=(1,n_gram_degree), max_features=cut_off_max_size)
+            vectorizer = []
+            for n in range(1, n_gram_degree+1):
+                vectorizer.append(TfidfVectorizer(tokenizer=Preprocessor.tokenize, stop_words=nltk.corpus.stopwords.words('dutch'), min_df=cut_off_freq, ngram_range=(n,n), max_features=cut_off_max_size, norm='l1', use_idf=True, smooth_idf=True))
         else:
             complete_features_sets = [[[]] for i in range(0, len(content_list))]
-            vectorizer = TfidfVectorizer(tokenizer=Preprocessor.tokenize, stop_words=nltk.corpus.stopwords.words('dutch'), min_df=cut_off_freq, ngram_range=(n_gram_degree,n_gram_degree), max_features=cut_off_max_size)
+            vectorizer = TfidfVectorizer(tokenizer=Preprocessor.tokenize, stop_words=nltk.corpus.stopwords.words('dutch'), min_df=cut_off_freq, ngram_range=(n_gram_degree,n_gram_degree), max_features=cut_off_max_size, norm='l1', use_idf=True, smooth_idf=True)
 
         for content_index in range(0,len(content_list)):
             content_column = [row[content_list[content_index]] for row in raw_data]
-            vectorizer.fit(content_column)
             if is_accumalative_n_gram:
                 if n_gram_degree > 1:
-                    mixed_feature_sets = vectorizer.get_feature_names()
                     for n in range(0, n_gram_degree):
-                        ngrams = [ngram for ngram in mixed_feature_sets if ngram.count(' ') == n]
-                        complete_features_sets[content_index][n] = ngrams
+                        vectorizer[n].fit(content_column)
+                        complete_features_sets[content_index][n] = vectorizer[n].get_feature_names()
                 else:
-                    complete_features_sets[content_index][0] = vectorizer.get_feature_names()
+                    vectorizer[0].fit(content_column)
+                    complete_features_sets[content_index][0] = vectorizer[0].get_feature_names()
             else:
+                vectorizer.fit(content_column)
                 complete_features_sets[content_index][0] = vectorizer.get_feature_names()
-            
-            
 
         complete_features_per_record = self.create_n_gram_features_per_record(raw_data, content_list, n_gram_degree, is_accumalative_n_gram)
+
         return (complete_features_sets, complete_features_per_record)
 
     #2.1.1-B
@@ -232,7 +233,6 @@ class Preprocessor(object):
         #Stem words
         stemmer = nltk.stem.snowball.DutchStemmer()
         content = [stemmer.stem(word) for word in content]
-
         return content
 
 class Datatype(Enum):
