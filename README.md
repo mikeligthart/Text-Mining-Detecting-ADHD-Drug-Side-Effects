@@ -1,4 +1,4 @@
-ext Mining: Detecting ADHD Drug Side Effects in Forum Posts
+Text Mining: Detecting ADHD Drug Side Effects in Forum Posts
 =============================
 Source code to Ligthart, Mike, Text Mining: Detecting ADHD Drug Side Effects in Forum Posts, Text Mining Midterm Paper (LET-REMA-LCEX06), Radboud University, 2014
 
