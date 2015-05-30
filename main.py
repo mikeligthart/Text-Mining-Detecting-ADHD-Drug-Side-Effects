@@ -10,7 +10,6 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn import metrics
 from sklearn import cross_validation
 from sklearn.grid_search import GridSearchCV
-from preprocessor import Preprocessor
 import nltk
 import random
 
@@ -42,7 +41,7 @@ positive_data = [data[index] for index in range(0,len(data)) if labels[index] ==
 # Randomly copy positive data and inject that into the positive data set
 positive_data_original_lenght = len(positive_data)
 while(len(negative_data) > len(positive_data)):
-    positive_data.append(positive_data[random.randint(0,positive_data_original_lenght)])   
+    positive_data.append(positive_data[random.randint(0,positive_data_original_lenght-1)])   
 
 # Create balanced data
 balanced_data = []
@@ -59,7 +58,23 @@ random.shuffle(mix)
 balanced_data, balanced_labels = zip(*mix)
 
 ## FEATURE EXTRACTION ##
-feature_extractor = TfidfVectorizer(tokenizer=Preprocessor.tokenize, stop_words=nltk.corpus.stopwords.words('dutch'))
+def tokenize(content):
+    #Define Artefacts
+    artefacts = ['\\n']
+    
+    #Tokenize content into words
+    content = nltk.regexp_tokenize(content, r'\w+')
+
+    #Remove artifacts in content
+    for artefact in artefacts:
+        content = [word.replace(artefact,'') for word in content]
+
+    #Stem words
+    stemmer = nltk.stem.snowball.DutchStemmer()
+    content = [stemmer.stem(word) for word in content]
+    return content
+
+feature_extractor = TfidfVectorizer(tokenizer=tokenize, stop_words=nltk.corpus.stopwords.words('dutch'))
 
 ## FEATURE SELECTION ##
 feature_selector = LinearSVC(penalty="l1", dual=False)  
@@ -74,12 +89,13 @@ svm_clf = SGDClassifier(loss='hinge', penalty='l2', alpha=1e-3, n_iter=5)
 svm_pip = Pipeline([('extractor', feature_extractor),('selector', feature_selector),('classifier', svm_clf)])
 
 ## EVALUATION USING GRID SEARCH ##
-parameters = {'extractor__ngram_range': [(1,1), (2,2), (3,3), (1,2), (1,3), (2,3)]}
+#parameters = {'extractor__ngram_range': [(1,1), (2,2), (3,3), (1,2), (1,3), (2,3)]}
+parameters = {'extractor__ngram_range': [(1,1)]}
 
 # Naive Bayes
-nb_gs = GridSearchCV(nb_pip, parameters, 'f1',cv=number_of_folds, verbose=1)
-nb_gs.fit(balanced_data, balanced_labels)
-print(nb_gs.grid_scores_)
+#nb_gs = GridSearchCV(nb_pip, parameters, 'f1',cv=number_of_folds, verbose=1)
+#nb_gs.fit(balanced_data, balanced_labels)
+#print(nb_gs.grid_scores_)
 
 # Support Vector Machine
 svm_gs = GridSearchCV(svm_pip, parameters, 'f1', cv=number_of_folds, verbose=1)
