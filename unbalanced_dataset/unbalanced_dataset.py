@@ -87,6 +87,7 @@ from __future__ import division
 from __future__ import print_function
 from numpy.random import seed, randint, uniform
 from numpy import zeros, ones
+import numpy as np
 
 __author__ = 'fnogueira, glemaitre'
 
@@ -186,8 +187,8 @@ class UnbalancedDataset(object):
             Nothing
         """
 
-        self.x = x
-        self.y = y
+        self.x = x.toarray() #changed to fit my code
+        self.y = np.asarray(y) #changed to fit my code
 
         if self.verbose:
             print("Determining classes statistics... ", end="")
