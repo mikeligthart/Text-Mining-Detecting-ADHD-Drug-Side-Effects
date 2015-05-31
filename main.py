@@ -1,9 +1,6 @@
 import os
 from evaluation_pipeline import Pipeline
-
-from sklearn.naive_bayes import MultinomialNB
-from sklearn.linear_model import SGDClassifier
-from unbalanced_dataset import SMOTE, UnderSampler
+from unbalanced_dataset import SMOTE, UnderSampler, OverSampler, NearMiss
 
 ## SETTINGS ##
 location = 'data/rivm/'
@@ -12,6 +9,7 @@ label_index = 11
 folds = os.listdir(location)
 delimiter = '\t'
 folds[:] = [location + i for i in folds]
+verbose = True
 
 ## LOAD RAW DATA ##
 raw_data = []
@@ -30,8 +28,6 @@ for fold_nr in range(0, len(folds)):
     file.close()
 
 ## EVALUATE ##
-classifier = SGDClassifier(loss='hinge', penalty='l2', alpha=0.001, n_iter=100)
-resampler = SMOTE(verbose=True)
-
-pip1 = Pipeline(feat_content, labels, resampler, classifier)
-av_f1, _ = pip1.validation()
+resampler = SMOTE(verbose=verbose)
+pip = Pipeline(feat_content, labels, resampler, verbose)
+f1_complete = pip.validation()

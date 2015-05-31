@@ -3,12 +3,14 @@ from nltk.corpus import stopwords
 from nltk import regexp_tokenize
 from nltk.stem.snowball import DutchStemmer
 import re
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.linear_model import SGDClassifier
 from sklearn.svm import LinearSVC
 from sklearn.metrics import f1_score
     
 class Pipeline(object):
 
-    def __init__(self, data, labels, resampler, classifier, verbose=True):
+    def __init__(self, data, labels, resampler, verbose=True):
         self.data = data
         self.labels = labels
         self.verbose = verbose
@@ -24,16 +26,12 @@ class Pipeline(object):
         self.feature_selector = LinearSVC(penalty="l1", dual=False)
 
         # Classification - VARIABLE #
-        self.classifier = classifier
+        self.nb = MultinomialNB()
+        self.svm = SGDClassifier(loss='hinge', penalty='l2', alpha=0.001, n_iter=100)
 
     def validation(self):
         ## K-FOLD CROSS-VALIDATION##
-        training_set = []
-        training_labels = []
-        test_set = []
-        test_labels = []
-        predicted_labels = []
-        f1_score_fold = []
+        f1_score_fold = [[],[]]
 
         if self.verbose:
             print "Start with %d-fold cross-validation" % len(self.data)
@@ -41,42 +39,47 @@ class Pipeline(object):
             #Creating test and training set per fold
             if self.verbose:
                 print "Creating training en test set for fold %d" % (k+1) 
-            training_set.append([item for sublist in self.data[0:k] + self.data[k+1:len(self.data)]  for item in sublist])
-            training_labels.append([item for sublist in self.labels[0:k] + self.labels[k+1:len(self.data)] for item in sublist])
-            test_set.append(self.data[k])
-            test_labels.append(self.labels[k])
+            training_set = [item for sublist in self.data[0:k] + self.data[k+1:len(self.data)]  for item in sublist]
+            training_labels = [item for sublist in self.labels[0:k] + self.labels[k+1:len(self.data)] for item in sublist]
+            test_set = self.data[k]
+            test_labels = self.labels[k]
 
+            #Feature extractions
             if self.verbose:
                 print "Extracting features"
-            #Feature extractions
-            training_set[k] = self.feature_extractor.fit_transform(training_set[k])
-            test_set[k] = self.feature_extractor.transform(test_set[k])
+            training_set = self.feature_extractor.fit_transform(training_set)
+            test_set = self.feature_extractor.transform(test_set)
 
+            #Re-sampling
             if self.verbose:
                 print "Re-sampling training set"
-            #Re-sampling
-            training_set[k], training_labels[k] = self.resampler.fit_transform(training_set[k], training_labels[k])
+            training_set, training_labels = self.resampler.fit_transform(training_set, training_labels)
 
+            #Feature selection
             if self.verbose:
                 print "Selecting best features"
-            #Feature selection
-            training_set[k] = self.feature_selector.fit_transform(training_set[k], training_labels[k])
-            test_set[k] = self.feature_selector.transform(test_set[k])
+            training_set = self.feature_selector.fit_transform(training_set, training_labels)
+            test_set = self.feature_selector.transform(test_set)
 
-            if self.verbose:
-                print "Training classifier"
             #Training classifiers
-            self.classifier.fit_transform(training_set[k], training_labels[k])
-
             if self.verbose:
-                print "Calculating f1-score"
+                print "Training classifiers"
+            self.nb.fit(training_set, training_labels)
+            self.svm.fit(training_set, training_labels)
+
             #Predicting class labels test set
-            predicted_labels.append(self.classifier.predict(test_set[k]))
-            f1_score_fold.append(f1_score(test_labels[k], predicted_labels[k]))
+            if self.verbose:
+                print "Calculating f1-scores"
+            nb_predicted_labels = self.nb.predict(test_set)
+            svm_predicted_labels = self.svm.predict(test_set)
+
+            f1_score_fold[0].append(f1_score(test_labels, nb_predicted_labels))
+            f1_score_fold[1].append(f1_score(test_labels, svm_predicted_labels))
 
         ## RESULTS ##
-        print "Avarage f1_score is %f" % (sum(f1_score_fold)/len(f1_score_fold))
-        return (sum(f1_score_fold)/len(f1_score_fold)), f1_score_fold
+        print "Avarage Naive Bayes f1_score is %f" % (sum(f1_score_fold[0])/len(f1_score_fold[0]))
+        print "Avarage Support Vector Machine f1_score is %f" % (sum(f1_score_fold[1])/len(f1_score_fold[1]))
+        return f1_score_fold
 
     def _tokenize(self, content):
         #Define Artefacts

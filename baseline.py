@@ -20,6 +20,7 @@ label_index = 11
 folds = os.listdir(location)
 delimiter = '\t'
 folds[:] = [location + i for i in folds]
+positive_negative_ratio = 1.0
 
 ## LOAD RAW DATA ##
 raw_data = []
@@ -55,8 +56,7 @@ for k in range(0, len(folds)):
     test_labels.append(labels[k])
 
     ## BALANCING DATA ##
-    # Balancing techniques
-    # 1. Custum Upsampling: randomly copy positive data and inject that into the positive data set
+    # Custum Upsampling: randomly copy positive data and inject that into the positive data set
 
     # Retrive negative and positive portions of the data
     negative_data = [training_set[k][index] for index in range(0,len(training_set[k])) if training_labels[k][index] == 0]
@@ -80,9 +80,6 @@ for k in range(0, len(folds)):
     mix = list(zip(upsampled_training_set[k], upsampled_training_labels[k]))
     random.shuffle(mix)
     upsampled_training_set[k], upsampled_training_labels[k] = zip(*mix)
-
-# 2.
-N_oversampling = SMOTE(verbose=True)
 
 ## FEATURE EXTRACTION ##
 def tokenize(content):
@@ -113,48 +110,35 @@ feature_extractor = TfidfVectorizer(tokenizer=tokenize, stop_words=stopwords.wor
 feature_selector = LinearSVC(penalty="l1", dual=False)  
 
 ## CLASSIFIERS ##
-
 # NAIVE BAYES
 nb_clf = MultinomialNB()
 nb_pip = Pipeline([('extractor', feature_extractor),('selector', feature_selector),('classifier', nb_clf)])
 
 # SUPPORT VECTOR MACHINE
-svm_clf = SGDClassifier(loss='hinge', penalty='l2', alpha=0.001, n_iter=100)
-
 # Class weights
 svm_weights_clf = SGDClassifier(loss='hinge', penalty='l2', alpha=0.001, n_iter=100, class_weight = {1: 5})
 svm_weights_pip = Pipeline([('extractor', feature_extractor),('selector', feature_selector),('classifier', svm_weights_clf)])
 
-# Nogueira oversampling
-svm_N_oversampling_pip = Pipeline([('extractor', feature_extractor), ('re-sample', N_oversampling),('selector', feature_selector),('classifier', svm_clf)])
-
 ## EVALUATION - K-FOLD CROSS-VALIDATION - F1-SCORE ##
 svm_weights_f1_score = []
-svm_N_oversampling_f1_score = []
 nb_f1_score = []
 print "Start with %d-fold cross-validation" % len(folds)
 for k in range(0,len(folds)):
     print "Fold %d" % k
 
     # Support Vector Machine
-    """print "Evaluating SVM with class weights" 
+    print "Evaluating SVM with class weights" 
     svm_weights_pip.fit(training_set[k], training_labels[k])
     svm_predicted_test_labels = svm_weights_pip.predict(test_set[k])
-    svm_weights_f1_score.append(f1_score(test_labels[k], svm_predicted_test_labels))"""
-
-    print "Evaluating SVM with Nogueira oversampling" 
-    svm_N_oversampling_pip.fit(training_set[k], training_labels[k])
-    svm_predicted_test_labels = svm_N_oversampling_pip.predict(test_set[k])
-    svm_N_oversampling_f1_score.append(f1_score(test_labels[k], svm_predicted_test_labels))
+    svm_weights_f1_score.append(f1_score(test_labels[k], svm_predicted_test_labels))
 
     # Naive Bayes
-    """print "Evaluating NB with custom upsampling" 
+    print "Evaluating NB with custom upsampling" 
     nb_pip.fit(upsampled_training_set[k], upsampled_training_labels[k])
     nb_predicted_test_labels = nb_pip.predict(test_set[k])
-    nb_f1_score.append(f1_score(test_labels[k], nb_predicted_test_labels))"""
+    nb_f1_score.append(f1_score(test_labels[k], nb_predicted_test_labels))
 
-#print "Avarage f1-score Support Vector Machine with class weights: %1.3f" % (sum(svm_weights_f1_score)/len(svm_weights_f1_score))
-print "Avarage f1-score Support Vector Machine with Nogueira oversampling: %1.3f" % (sum(svm_N_oversampling_f1_score)/len(svm_N_oversampling_f1_score))
-#print "Avarate f1-score Naive Bayes: %1.3f" % (sum(nb_f1_score)/len(nb_f1_score))
+print "Avarage f1-score Support Vector Machine with class weights: %1.3f" % (sum(svm_weights_f1_score)/len(svm_weights_f1_score))
+print "Avarate f1-score Naive Bayes: %1.3f" % (sum(nb_f1_score)/len(nb_f1_score))
 
 
